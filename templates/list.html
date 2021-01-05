@@ -1,0 +1,15 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pets List</title>
+</head>
+<body>
+    <a href="/new">Go to the form</a>
+    <br>
+    <ul>
+        ${pets.map(pet => `<li>${pet.name}: ${pet.breed} <a href="/list/${pet.id}"><button>Edit</button></a> <a href="/list/${pet.id}/delete"><button>Delete</button></a></li>`).join('')}
+    </ul>
+</body>
+</html>

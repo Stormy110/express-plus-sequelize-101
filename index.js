@@ -2,6 +2,7 @@ const http = require('http');
 const express = require('express');
 const morgan = require('morgan');
 const helmet = require('helmet');
+const es6Renderer = require('express-es6-template-engine');
 
 const app = express();
 const server = http.createServer(app);
@@ -11,12 +12,17 @@ const HOST = '0.0.0.0';
 
 const logger = morgan('tiny');
 
+app.engine('html', es6Renderer);
+app.set('views', 'templates');
+app.set('view engine', 'html');
+
+const { newForm, processForm } = require('./controllers/pet')
+
 // JS library that speaks to Postgres
 const Sequelize = require('sequelize');
 // Pets is an object that can
 const { Pets } = require('./models');
 
-const db = [];
 
 app.use(logger);
 // Disabling for local development
@@ -26,66 +32,69 @@ app.use(logger);
 app.use(express.urlencoded({extended: true}));
 
 app.get('/', (req, res) => {
-    res.send(`<h1>Hello!</h1><br><a href="/new">Go to the form</a>`)
+    res.render('home')
 });
 
-app.get('/new', (req, res) => {
-    res.send(`
-<h1>Say something!</h1>
-<form method="POST">
-  <label>
-    Name:
-    <input name="name" type="text" autofocus />
-  </label>
-  <label>
-    Breed:
-    <input name="breed" type="text" />
-  </label> 
- <input type="submit" value="do it!" />
-</form>
-    `);
-});
+app.get('/new', newForm);
 
 // When using Sequelize, you need async/await
 // Put async in front of (req, res)
 // It means that you will use the `await` keyword in the function
-app.post('/new', async (req, res) => {
-    const { name, breed } = req.body;
-    // db.push(thought);
-    // await will "pause" before running the rest
-    // of the function.
-    // 1. We start to talk to Postgres: Pets.create()
-    // 2. Pause...until Postgres answers
-    // 3. Whenever we finish talking to Postgres, assign result
-    //    to new variable: newPet
-    // const petDataFromTheForm = {
-    //     name,   // equivalent to name: name
-    //     breed   // equivalent to breed: breed
-    // };
-    // const newPet = await Pets.create(petDataFromTheForm);
-    // console.log(newPet);
-    await Pets.create({
-      name,
-      breed
-  });
-    res.redirect('/list');    
+app.post('/new', processForm);
+
+app.get('/list', async (req, res) => {
+  // Read/retrieve all pets
+    const pets = await Pets.findAll()
+    res.render('list',{
+      locals: {
+        pets
+      }
+    });
+        
 });
 
-app.get('/list', (req, res) => {
-  // Read/retrieve all pets
-    Pets.findAll()
-        .then(pets => {
-            // res.json(pets);
-            //console.log(pets);
-              res.send(`
-          <a href="/new">Go to the form</a>
-          <ul>
-            ${
-              pets.map(pet => `<li>${pet.name}: ${pet.breed}</li>`).join('')
-            }
-          </ul>
-              `);
-        })
+app.get('/list/:id', async (req,res)=>{
+  const pet = await Pets.findByPk(req.params.id);
+  res.render('edit', {
+    locals: {
+      petName: pet.name,
+      petBreed: pet.breed
+    }
+  })
+})
+
+app.post('/list/:id', async (req,res)=>{
+  const { name, breed } = req.body;
+  const { id } = req.params;
+  const updatedPet = await Pets.update({
+    name,
+    breed
+  }, {
+    where: {
+      id
+    }
+  });
+  res.redirect('/list')
+});
+
+app.get('/list/:id/delete', async (req,res)=>{
+  const { id } = req.params;
+  const pet = await Pets.findByPk(id);
+  res.render('delete', {
+    locals: {
+      name: pet.name
+    }
+  })
+});
+
+app.post('/list/:id/delete', async (req,res)=>{
+  const { id } = req.params;
+  const deletedPet = Pets.destroy({
+    where: {
+      id
+    }
+  });
+  res.redirect('/list')
 });
 
 server.listen(PORT, HOST, () => {
